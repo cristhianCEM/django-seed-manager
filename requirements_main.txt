@@ -1,1 +1,2 @@
 django-stream-logging==0.2.1
+Faker>=30.0.0
