@@ -1,14 +1,15 @@
-from random import randint, choice
+from random import randint, choice, uniform
 from datetime import datetime, timedelta, timezone
 from faker import Faker
 
+DEFAULT_LOCALE = 'es_MX'
 DEFAULT_TIMEZONE_OFFSET = -6
 BOOLEANS = [True, False]
 
 
 class SeedFaker:
-    def __init__(self, timezone_hours_offset=DEFAULT_TIMEZONE_OFFSET):
-        self.fake = Faker()
+    def __init__(self, locale=DEFAULT_LOCALE, timezone_hours_offset=DEFAULT_TIMEZONE_OFFSET):
+        self.fake = Faker(locale)
         self.timezone_hours_offset = timezone_hours_offset
         self.timezone_delta = timedelta(hours=self.timezone_hours_offset)
 
@@ -17,6 +18,9 @@ class SeedFaker:
 
     def decision(self) -> bool:
         return choice(BOOLEANS)
+
+    def decimal(self, min_value: int = 0, max_value: int = 1, decimal_places: int = 2):
+        return round(uniform(min_value, max_value), decimal_places)
 
     def date_time_future(self, min_days=1, max_days=10):
         today = datetime.now(timezone.utc) + self.timezone_delta
@@ -38,4 +42,8 @@ class SeedFaker:
 
     def city(self, uppercase: bool = False):
         result = self.fake.city()
+        return result.upper() if uppercase else result
+
+    def text(self, max_nb_chars: int = 100, uppercase: bool = False):
+        result = self.fake.text(max_nb_chars)
         return result.upper() if uppercase else result
