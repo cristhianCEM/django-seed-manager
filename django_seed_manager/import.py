@@ -5,14 +5,14 @@ from typing import List, IO, Dict, Union
 import openpyxl
 import csv
 import json
+import os
 
-# Tipos soportados de archivos
 TYPE_JSON = 'json'
 TYPE_CSV = 'csv'
 TYPE_XLSX = 'xlsx'
 
 
-# Excepciones personalizadas
+# Excepciones
 class LoadFileJsonException(Exception):
     """Excepción para errores al cargar archivos JSON."""
     def __init__(self, message: str):
@@ -37,7 +37,13 @@ class UnsupportedImportFormat(Exception):
         super().__init__(f"El formato de archivo '{file_format}' no es soportado para la importación.")
 
 
-# Funciones para cargar archivos
+# Funciones de Validación
+def is_valid_extension(path: str, valid_extensions: List[str]) -> bool:
+    _, ext = os.path.splitext(path)
+    return ext.lower() in valid_extensions
+
+
+# Funciones de carga
 def load_json_file(path: Union[str, IO], encoding: str = 'utf-8') -> Union[Dict, List]:
     """
     Carga datos JSON desde un archivo.
@@ -47,18 +53,16 @@ def load_json_file(path: Union[str, IO], encoding: str = 'utf-8') -> Union[Dict,
     Returns:
         Union[Dict, List]: Contenido del archivo JSON.
     """
+    if isinstance(path, str) and not path.endswith('.json'):
+        raise LoadFileJsonException("La ruta no apunta a un archivo JSON válido.")
     try:
-        if isinstance(path, str) and not path.endswith('.json'):
-            raise LoadFileJsonException("La ruta no apunta a un archivo JSON válido.")
         if isinstance(path, str):
             with open(path, 'r', encoding=encoding) as file:
                 return json.load(file)
         else:
             return json.load(path)
-    except FileNotFoundError:
-        raise LoadFileJsonException(f"El archivo no se encontró en la ruta especificada: {path}")
-    except json.JSONDecodeError as e:
-        raise LoadFileJsonException(f"El archivo JSON tiene un formato inválido: {e}")
+    except Exception as e:
+        raise LoadFileJsonException(str(e))
 
 
 def get_values_from_excel(file: Union[IO, str]) -> List[List]:
@@ -105,8 +109,7 @@ def detect_encoding(file: BytesIO) -> str:
     """
     raw_data = file.read(10000)
     file.seek(0)
-    result = chardet.detect(raw_data)
-    return result['encoding']
+    return chardet.detect(raw_data)['encoding']
 
 
 def get_stringio_from_file(file: BytesIO) -> StringIO:
