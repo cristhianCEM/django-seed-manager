@@ -1,64 +1,69 @@
 import chardet
 from django.core.exceptions import ValidationError
-from io import StringIO
-from typing import List
+from io import StringIO, BytesIO
+from typing import List, IO, Dict, Union
 import openpyxl
 import csv
-from typing import IO, List, Dict, Union
 import json
-from io import BytesIO, StringIO
 
 # Tipos soportados de archivos
-
 TYPE_JSON = 'json'
 TYPE_CSV = 'csv'
 TYPE_XLSX = 'xlsx'
 
 
+# Excepciones personalizadas
 class LoadFileJsonException(Exception):
-    def __init__(self, message):
-        self.message = "Error cargando el archivo JSON - " + message
-        super().__init__(self.message)
+    """Excepción para errores al cargar archivos JSON."""
+    def __init__(self, message: str):
+        super().__init__(f"Error cargando el archivo JSON - {message}")
 
 
 class GetValuesFromExcelException(Exception):
+    """Excepción para errores al procesar un archivo Excel."""
     def __init__(self, exception: Exception):
-        message = "Error al obtener la lista del archivo excel: "
-        super().__init__(message + f"\n{exception}")
+        super().__init__(f"Error al obtener la lista del archivo Excel: {exception}")
 
 
 class GetRecordsFromCsvException(Exception):
+    """Excepción para errores al procesar un archivo CSV."""
     def __init__(self, exception: Exception):
-        message = "Error al obtener la lista del archivo csv: "
-        super().__init__(f"{message}\n{exception}")
+        super().__init__(f"Error al procesar el archivo CSV: {exception}")
 
 
-def load_json_file(path: str, encoding: str = 'utf-8') -> Union[Dict, List]:
+class UnsupportedImportFormat(Exception):
+    """Excepción para formatos de archivo no soportados."""
+    def __init__(self, file_format: str):
+        super().__init__(f"El formato de archivo '{file_format}' no es soportado para la importación.")
+
+
+# Funciones para cargar archivos
+def load_json_file(path: Union[str, IO], encoding: str = 'utf-8') -> Union[Dict, List]:
     """
     Carga datos JSON desde un archivo.
     Args:
-        path (str): Ruta al archivo JSON.
+        path (str o IO): Ruta al archivo JSON o archivo en BytesIO.
         encoding (str): Codificación del archivo.
     Returns:
         Union[Dict, List]: Contenido del archivo JSON.
     """
-    if not path or not path.endswith('.json'):
-        raise LoadFileJsonException("La ruta está vacía o el archivo no es JSON.")
     try:
-        with open(path, 'r', encoding=encoding) as file:
-            return json.load(file)
+        if isinstance(path, str) and not path.endswith('.json'):
+            raise LoadFileJsonException("La ruta no apunta a un archivo JSON válido.")
+        if isinstance(path, str):
+            with open(path, 'r', encoding=encoding) as file:
+                return json.load(file)
+        else:
+            return json.load(path)
     except FileNotFoundError:
         raise LoadFileJsonException(f"El archivo no se encontró en la ruta especificada: {path}")
     except json.JSONDecodeError as e:
         raise LoadFileJsonException(f"El archivo JSON tiene un formato inválido: {e}")
 
 
-# init xslx functions
-
-
 def get_values_from_excel(file: Union[IO, str]) -> List[List]:
     """
-    Extrae valores de un archivo Excel, tal como esten en el archivo.
+    Extrae valores de un archivo Excel.
     Args:
         file (IO o str): Archivo Excel o ruta al archivo.
     Returns:
@@ -84,13 +89,10 @@ def get_records_from_excel(file: Union[IO, str]) -> List[Dict]:
     if not values:
         return []
     headers = values[0]
-    records = []
-    for row in values[1:]:
-        row_data = {headers[i]: row[i] for i in range(len(headers))}
-        records.append(row_data)
-    return records
-
-# init csv functions
+    return [
+        {headers[i]: row[i] for i in range(len(headers))}
+        for row in values[1:]
+    ]
 
 
 def detect_encoding(file: BytesIO) -> str:
@@ -138,12 +140,6 @@ def get_records_from_csv(file: Union[BytesIO, StringIO]) -> List[Dict]:
         raise GetRecordsFromCsvException(e)
 
 
-class UnsupportedImportFormat(Exception):
-    def __init__(self, file_format: str):
-        self.file_format = file_format
-        super().__init__(f"El formato de archivo '{file_format}' no es soportado para la importación.")
-
-
 def load_file(file: Union[IO, str], file_type: str) -> List[Dict]:
     """
     Carga un archivo en formato JSON, CSV o Excel según el tipo especificado.
@@ -155,6 +151,7 @@ def load_file(file: Union[IO, str], file_type: str) -> List[Dict]:
     """
     if not file:
         raise ValidationError("No se ha proporcionado un archivo.")
+
     if file_type == TYPE_JSON:
         return load_json_file(file)
     elif file_type == TYPE_CSV:
@@ -162,4 +159,4 @@ def load_file(file: Union[IO, str], file_type: str) -> List[Dict]:
     elif file_type == TYPE_XLSX:
         return get_records_from_excel(file)
     else:
-        UnsupportedImportFormat(file_type)
+        raise UnsupportedImportFormat(file_type)
