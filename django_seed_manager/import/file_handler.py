@@ -6,18 +6,19 @@ class FileHandler(ABC):
     """
     Contrato base para todos los manejadores de archivos.
     """
+    @property
     @abstractmethod
-    def load(self, file):
-        """Carga el archivo para su procesamiento."""
-        pass
+    def allow_multiple_models(self) -> bool:
+        """Indica si el manejador permite la carga de múltiples modelos."""
+        raise NotImplementedError()
 
     @abstractmethod
-    def get_records(self) -> List[Dict]:
-        """Devuelve los registros del archivo como una lista de diccionarios."""
-        pass
+    def load(self, *args, **kwargs):
+        """Obtiene los datos del archivo."""
+        raise NotImplementedError()
 
 
-class UnsupportedImportFileFormat(Exception):
+class UnsupportedFileFormat(Exception):
     """Excepción para formatos de archivo no soportados."""
 
     def __init__(self, file_format: str):
@@ -39,5 +40,5 @@ class FileHandlerRegistry:
     def get_handler(self, file_format: str) -> FileHandler:
         """Obtiene el manejador para un tipo de archivo."""
         if file_format not in self.handlers:
-            raise UnsupportedImportFileFormat(file_format)
+            raise UnsupportedFileFormat(file_format)
         return self.handlers[file_format]
